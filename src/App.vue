@@ -11,6 +11,8 @@ const GOOGLE_URL =
 const menuOpen = ref(false)
 const stuck = ref(false)
 const tried = ref(false)
+const sending = ref(false)
+const sent = ref(false)
 const error = ref('')
 
 const form = ref({
@@ -85,11 +87,47 @@ function validate() {
   return true
 }
 
-function prepareEmail() {
-  if (!validate()) return
-  const subject = encodeURIComponent(`Enquiry from ${form.value.name.trim()} — Neo Smart`)
-  const body = encodeURIComponent(enquiryText())
-  window.location.href = `mailto:${EMAIL_TO}?subject=${subject}&body=${body}`
+async function submitEnquiry() {
+  if (sending.value || sent.value || !validate()) return
+  sending.value = true
+  error.value = ''
+
+  const payload = {
+    name: form.value.name.trim(),
+    company: form.value.company.trim() || '—',
+    email: form.value.email.trim() || '—',
+    phone: form.value.phone.trim() || '—',
+    requirement: form.value.requirement.trim(),
+    _subject: `Enquiry from ${form.value.name.trim()} — Neo Smart`,
+    _template: 'table',
+    _captcha: 'false',
+  }
+  if (form.value.email.trim()) payload._replyto = form.value.email.trim()
+
+  try {
+    const response = await fetch(`https://formsubmit.co/ajax/${EMAIL_TO}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (typeof data.message === 'string' && /activation/i.test(data.message)) {
+      error.value =
+        'Almost ready. Open the activation email sent to info@neosmartgroup.com and click Activate Form, then send the enquiry again.'
+      return
+    }
+    if (!response.ok || data.success === false || data.success === 'false') {
+      throw new Error('send failed')
+    }
+    sent.value = true
+  } catch {
+    error.value = 'We could not send your enquiry. Please try again, or chat on WhatsApp.'
+  } finally {
+    sending.value = false
+  }
 }
 
 function chatWhatsApp() {
@@ -200,11 +238,16 @@ onUnmounted(() => {
       </div>
 
       <div class="hero-form">
-        <form id="enquiry" class="card" novalidate @submit.prevent="prepareEmail">
+        <form id="enquiry" class="card" novalidate @submit.prevent="submitEnquiry">
           <p class="card-kicker">Let's discuss your requirement</p>
           <h2>Tell us what you need.</h2>
 
-          <div class="fields">
+          <div v-if="sent" class="sent" role="status">
+            <p class="sent-title">Enquiry sent.</p>
+            <p>Thank you. Your requirement has been sent to info@neosmartgroup.com. We'll get back to you shortly.</p>
+          </div>
+
+          <div v-else class="fields">
             <label class="field" :class="{ 'is-invalid': nameInvalid }">
               <span>Full name <i class="req">*</i></span>
               <input v-model="form.name" type="text" name="name" autocomplete="name" placeholder="Your full name..." aria-required="true" />
@@ -233,18 +276,18 @@ onUnmounted(() => {
             </label>
           </div>
 
-          <p class="hint" :class="{ 'is-error': error }" role="status">
+          <p v-if="!sent" class="hint" :class="{ 'is-error': error }" role="status">
             {{ error || 'Please provide an email or mobile number.' }}
           </p>
 
           <div class="form-actions">
-            <button class="btn btn-blue btn-block" type="submit">
-              Prepare email enquiry
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <button v-if="!sent" class="btn btn-blue btn-block" type="submit" :disabled="sending">
+              {{ sending ? 'Sending enquiry…' : 'Send enquiry' }}
+              <svg v-if="!sending" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </button>
-            <p class="fine">Opens your email app with your enquiry ready to send.</p>
+            <p v-if="!sent" class="fine">Your enquiry is sent to info@neosmartgroup.com.</p>
             <button class="btn btn-line btn-block" type="button" @click="chatWhatsApp">
               <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
                 <path fill="currentColor" d="M8.1 1.4A6.5 6.5 0 0 0 2.3 11L1.5 14.4l3.5-.8A6.5 6.5 0 1 0 8.1 1.4Zm3.4 9.1c-.1.4-.8.7-1.1.8-.3 0-.6.1-2-.5-1.7-.8-2.8-2.5-2.9-2.6-.1-.1-.8-1-.8-1.9s.5-1.4.7-1.5h.5c.1 0 .3 0 .4.4.2.4.6 1.4.6 1.5.1.1 0 .3-.1.4l-.3.4c-.1.1-.2.2 0 .4.2.4.8 1.2 1.6 1.8.6.5 1.2.6 1.4.7.2 0 .3 0 .4-.1l.5-.6c.1-.2.3-.1.5-.1l1.2.6c.2.1.3.1.4.2.1.2 0 .6-.1.9Z" />

@@ -378,6 +378,30 @@ textarea {
   margin-top: 14px;
 }
 
+.btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+}
+
+.sent {
+  padding: 8px 0 4px;
+}
+
+.sent-title {
+  margin: 0 0 8px;
+  color: var(--blue);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.sent p:last-child {
+  margin: 0;
+  color: #3a5f82;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
 .fine {
   margin: -2px 0 0;
   text-align: center;
