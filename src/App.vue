@@ -1,7 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
-const EMAIL_TO = 'info@neosmartgroup.com'
 const PHONE_E164 = '971529708692'
 const PHONE_DISPLAY = '+971 52 970 8692'
 const PROFILE_URL = 'https://neosmartgroup.com/about-us/company-overview/'
@@ -14,6 +13,7 @@ const tried = ref(false)
 const sending = ref(false)
 const sent = ref(false)
 const error = ref('')
+const botField = ref('')
 
 const form = ref({
   name: '',
@@ -89,39 +89,31 @@ function validate() {
 
 async function submitEnquiry() {
   if (sending.value || sent.value || !validate()) return
+  if (botField.value.trim()) {
+    sent.value = true
+    return
+  }
+
   sending.value = true
   error.value = ''
 
-  const payload = {
+  const body = new URLSearchParams({
+    'form-name': 'enquiry',
+    'bot-field': '',
     name: form.value.name.trim(),
-    company: form.value.company.trim() || '—',
-    email: form.value.email.trim() || '—',
-    phone: form.value.phone.trim() || '—',
+    company: form.value.company.trim(),
+    email: form.value.email.trim(),
+    phone: form.value.phone.trim(),
     requirement: form.value.requirement.trim(),
-    _subject: `Enquiry from ${form.value.name.trim()} — Neo Smart`,
-    _template: 'table',
-    _captcha: 'false',
-  }
-  if (form.value.email.trim()) payload._replyto = form.value.email.trim()
+  })
 
   try {
-    const response = await fetch(`https://formsubmit.co/ajax/${EMAIL_TO}`, {
+    const response = await fetch('/', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
     })
-    const data = await response.json().catch(() => ({}))
-    if (typeof data.message === 'string' && /activation/i.test(data.message)) {
-      error.value =
-        'Almost ready. Open the activation email sent to info@neosmartgroup.com and click Activate Form, then send the enquiry again.'
-      return
-    }
-    if (!response.ok || data.success === false || data.success === 'false') {
-      throw new Error('send failed')
-    }
+    if (!response.ok) throw new Error('send failed')
     sent.value = true
   } catch {
     error.value = 'We could not send your enquiry. Please try again, or chat on WhatsApp.'
@@ -238,7 +230,8 @@ onUnmounted(() => {
       </div>
 
       <div class="hero-form">
-        <form id="enquiry" class="card" novalidate @submit.prevent="submitEnquiry">
+        <form id="enquiry" class="card" name="enquiry" method="POST" novalidate @submit.prevent="submitEnquiry">
+          <input v-model="botField" class="hp" type="text" name="bot-field" tabindex="-1" autocomplete="off" />
           <p class="card-kicker">Let's discuss your requirement</p>
           <h2>Tell us what you need.</h2>
 

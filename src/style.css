@@ -378,6 +378,14 @@ textarea {
   margin-top: 14px;
 }
 
+.hp {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 .btn:disabled {
   opacity: 0.7;
   cursor: wait;
