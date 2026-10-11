@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
+const FORM_ACCESS_KEY = 'a5f952e9-6c47-4ca7-b4c1-c2a9583c0826'
 const PHONE_E164 = '971529708692'
 const PHONE_DISPLAY = '+971 52 970 8692'
 const PROFILE_URL = 'https://neosmartgroup.com/about-us/company-overview/'
@@ -97,23 +98,34 @@ async function submitEnquiry() {
   sending.value = true
   error.value = ''
 
-  const body = new URLSearchParams({
-    'form-name': 'enquiry',
-    'bot-field': '',
-    name: form.value.name.trim(),
-    company: form.value.company.trim(),
-    email: form.value.email.trim(),
-    phone: form.value.phone.trim(),
-    requirement: form.value.requirement.trim(),
-  })
+  const name = form.value.name.trim()
+  const email = form.value.email.trim()
+  const payload = {
+    access_key: FORM_ACCESS_KEY,
+    subject: `Enquiry from ${name} — Neo Smart`,
+    from_name: 'Neo Smart website',
+    name,
+    company: form.value.company.trim() || '—',
+    phone: form.value.phone.trim() || '—',
+    message: form.value.requirement.trim(),
+    botcheck: '',
+  }
+  if (email) {
+    payload.email = email
+    payload.replyto = email
+  }
 
   try {
-    const response = await fetch('/', {
+    const response = await fetch('https://api.web3forms.com/submit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
     })
-    if (!response.ok) throw new Error('send failed')
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok || data.success !== true) throw new Error('send failed')
     sent.value = true
   } catch {
     error.value = 'We could not send your enquiry. Please try again, or chat on WhatsApp.'
