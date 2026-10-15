@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 
 const FORM_ACCESS_KEY = 'a5f952e9-6c47-4ca7-b4c1-c2a9583c0826'
 const PHONE_E164 = '971529708692'
@@ -15,6 +15,7 @@ const sending = ref(false)
 const sent = ref(false)
 const error = ref('')
 const botField = ref('')
+const confirmation = ref(null)
 
 const form = ref({
   name: '',
@@ -91,7 +92,6 @@ function validate() {
 async function submitEnquiry() {
   if (sending.value || sent.value || !validate()) return
   if (botField.value.trim()) {
-    sent.value = true
     return
   }
 
@@ -127,11 +127,24 @@ async function submitEnquiry() {
     const data = await response.json().catch(() => ({}))
     if (!response.ok || data.success !== true) throw new Error('send failed')
     sent.value = true
+    await nextTick()
+    window.scrollTo({ top: 0, behavior: 'instant' })
+    confirmation.value?.focus()
   } catch {
     error.value = 'We could not send your enquiry. Please try again, or chat on WhatsApp.'
   } finally {
     sending.value = false
   }
+}
+
+async function resetEnquiry() {
+  form.value = { name: '', company: '', email: '', phone: '', requirement: '' }
+  botField.value = ''
+  tried.value = false
+  error.value = ''
+  sent.value = false
+  await nextTick()
+  document.querySelector('#enquiry input[name="name"]')?.focus()
 }
 
 function chatWhatsApp() {
@@ -165,7 +178,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <header class="site-header" :class="{ 'is-stuck': stuck }">
+  <header v-if="!sent" class="site-header" :class="{ 'is-stuck': stuck }">
     <div class="wrap header-inner">
       <a class="logo" href="#top" @click="closeMenu">
         <img src="/logo-light.png" alt="Neo Smart — Accelerating Scientific Progress" />
@@ -192,7 +205,7 @@ onUnmounted(() => {
     </div>
   </header>
 
-  <main id="top">
+  <main v-if="!sent" id="top">
     <section class="wrap hero">
       <div class="hero-copy">
         <p class="eyebrow">The complete scientific ecosystem</p>
@@ -244,15 +257,10 @@ onUnmounted(() => {
       <div class="hero-form">
         <form id="enquiry" class="card" name="enquiry" method="POST" novalidate @submit.prevent="submitEnquiry">
           <input v-model="botField" class="hp" type="text" name="bot-field" tabindex="-1" autocomplete="off" />
-          <p class="card-kicker">Let's discuss your requirement</p>
-          <h2>Tell us what you need.</h2>
+          <p v-if="!sent" class="card-kicker">Let's discuss your requirement</p>
+          <h2 v-if="!sent">Tell us what you need.</h2>
 
-          <div v-if="sent" class="sent" role="status">
-            <p class="sent-title">Enquiry sent.</p>
-            <p>Thank you. Your requirement has been sent to info@neosmartgroup.com. We'll get back to you shortly.</p>
-          </div>
-
-          <div v-else class="fields">
+          <div class="fields">
             <label class="field" :class="{ 'is-invalid': nameInvalid }">
               <span>Full name <i class="req">*</i></span>
               <input v-model="form.name" type="text" name="name" autocomplete="name" placeholder="Your full name..." aria-required="true" />
@@ -285,7 +293,7 @@ onUnmounted(() => {
             {{ error || 'Please provide an email or mobile number.' }}
           </p>
 
-          <div class="form-actions">
+          <div v-if="!sent" class="form-actions">
             <button v-if="!sent" class="btn btn-blue btn-block" type="submit" :disabled="sending">
               {{ sending ? 'Sending enquiry…' : 'Send enquiry' }}
               <svg v-if="!sending" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
@@ -301,7 +309,7 @@ onUnmounted(() => {
             </button>
           </div>
 
-          <div class="legal">
+          <div v-if="!sent" class="legal">
             <p>
               <strong>Privacy policy.</strong>
               Details you submit are used only to respond to your enquiry. They are sent to
@@ -387,7 +395,37 @@ onUnmounted(() => {
     </section>
   </main>
 
-  <footer class="site-footer">
+  <main v-else class="completion-page">
+    <section ref="confirmation" class="card confirmation" tabindex="-1" aria-labelledby="completion-title">
+      <div class="completion-brand">
+        <img src="/logo-light.png" alt="Neo Smart — Accelerating Scientific Progress" />
+      </div>
+      <div class="completion-body">
+      <div class="confirmation-check" aria-hidden="true">
+        <svg width="48" height="48" viewBox="0 0 48 48">
+          <path d="m12 24 8 8 17-18" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </div>
+      <h1 id="completion-title">Thank you!</h1>
+      <p>Your information has been submitted successfully.</p>
+      <div class="completion-stand">
+        <span>VISIT US AT ARABLAB</span>
+        <strong>Stand SSH1-D63</strong>
+      </div>
+      <p>Please show this confirmation to our team at the stand to receive a small gift.</p>
+      <div class="completion-actions">
+        <a class="btn btn-blue" :href="PROFILE_URL" target="_blank" rel="noopener noreferrer">View company profile</a>
+        <button class="btn btn-line" type="button" @click="resetEnquiry">Submit another response</button>
+      </div>
+      <div class="completion-review">
+        <p>Worked with Neo Smart?</p>
+        <a :href="GOOGLE_URL" target="_blank" rel="noopener noreferrer">Leave a Google review ↗</a>
+      </div>
+      </div>
+    </section>
+  </main>
+
+  <footer v-if="!sent" class="site-footer">
     <div class="wrap footer-inner">
       <p class="footer-mark">Connecting science, technology &amp; innovation</p>
       <div class="footer-links">
@@ -414,4 +452,128 @@ onUnmounted(() => {
 #solutions {
   scroll-margin-top: 92px;
 }
+
+.confirmation {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  text-align: center;
+}
+.completion-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 40px;
+}
+.confirmation:focus { outline: none; }
+.confirmation-check {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 20px;
+  border-radius: 50%;
+  color: var(--teal);
+  background: #eaf8fc;
+}
+.confirmation h1 {
+  margin: 0 0 20px;
+  color: var(--blue);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  font-size: clamp(32px, 5vw, 42px);
+}
+.confirmation p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.7;
+}
+.completion-actions .btn {
+  min-height: 48px;
+  padding: 12px 14px;
+  line-height: 1.35;
+}
+.completion-stand {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 12px 0 18px;
+  padding: 18px 16px;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--teal);
+  border-radius: 12px;
+  background: #f0f9fc;
+}
+.completion-stand span {
+  display: block;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+}
+.completion-stand strong {
+  display: block;
+  color: var(--blue);
+  font-size: clamp(25px, 5vw, 32px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+.completion-page {
+  width: min(680px, calc(100% - 32px));
+  min-height: 100svh;
+  margin: 0 auto;
+  padding: 32px 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.completion-brand {
+  width: 100%;
+  padding: 20px 24px;
+  background: var(--blue);
+  border-bottom: 3px solid var(--teal);
+}
+.completion-brand img {
+  display: block;
+  width: min(280px, 75%);
+  height: auto;
+  margin: 0 auto;
+}
+.completion-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 24px;
+}
+.completion-review {
+  width: 100%;
+  margin: 28px 0 0;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.confirmation .completion-review p {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+.completion-review a {
+  display: inline-block;
+  color: var(--blue);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 640px) {
+  .completion-body { padding: 28px 20px; }
+  .completion-actions { grid-template-columns: 1fr; }
+}
 </style>
+
